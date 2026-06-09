@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@flarelink/client — auth smoke test</title>
+    <style>
+      :root {
+        --bg: #f7f3ec;
+        --paper: #fffcf6;
+        --ink: #1a1814;
+        --ink-2: #4a443c;
+        --ink-3: #7e7569;
+        --border: #e6dfd1;
+        --accent: #d96812;
+        --accent-tint: #f4e5cf;
+        --ok: #1f7a3a;
+        --danger: #b13838;
+      }
+      * { box-sizing: border-box; }
+      body {
+        font: 14px/1.5 ui-sans-serif, system-ui, sans-serif;
+        background: var(--bg); color: var(--ink); margin: 0;
+        padding: 28px 18px;
+      }
+      .wrap { max-width: 760px; margin: 0 auto; }
+      h1 { font-size: 22px; margin: 0 0 4px; }
+      .sub { color: var(--ink-3); font-size: 13px; margin: 0 0 22px; }
+      .card {
+        background: var(--paper); border: 1px solid var(--border);
+        border-radius: 8px; padding: 18px 18px 14px; margin-bottom: 14px;
+      }
+      .card h2 {
+        font-size: 13px; text-transform: uppercase; letter-spacing: 0.12em;
+        color: var(--ink-3); margin: 0 0 12px; font-weight: 600;
+      }
+      label { display: block; margin-bottom: 10px; }
+      label > span {
+        display: block; font-size: 12.5px; color: var(--ink-2);
+        margin-bottom: 4px; font-weight: 500;
+      }
+      input, select {
+        width: 100%; font: inherit; padding: 7px 10px;
+        background: var(--paper); border: 1px solid var(--border);
+        border-radius: 6px; color: var(--ink); outline: none;
+      }
+      input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(217,104,18,.2); }
+      .row { display: flex; gap: 8px; flex-wrap: wrap; }
+      button {
+        font: inherit; font-weight: 500; cursor: pointer;
+        padding: 7px 12px; border-radius: 6px; border: 1px solid var(--border);
+        background: var(--paper); color: var(--ink);
+      }
+      button.primary { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+      button:hover { background: var(--accent-tint); }
+      button.primary:hover { background: var(--accent); border-color: var(--accent); }
+      pre.log {
+        background: #0f0d0a; color: #d7d2c5; font: 12px/1.55 ui-monospace, monospace;
+        border-radius: 6px; padding: 12px 14px; margin: 0;
+        max-height: 360px; overflow: auto; white-space: pre-wrap;
+      }
+      .log .ok { color: #6ec486; }
+      .log .err { color: #ee8a8a; }
+      .log .dim { color: #877d6c; }
+      .pill {
+        display: inline-block; padding: 1px 8px; border-radius: 999px;
+        font-size: 11px; font-weight: 500; vertical-align: middle;
+        margin-left: 6px;
+      }
+      .pill.in { background: #dff0e5; color: var(--ok); }
+      .pill.out { background: #f0e6d6; color: var(--ink-3); }
+      .config {
+        display: grid; grid-template-columns: 100px 1fr; gap: 6px 12px;
+        font-size: 12.5px; color: var(--ink-2); align-items: center;
+      }
+      .config code {
+        font: 12px/1 ui-monospace, monospace; background: var(--bg);
+        padding: 4px 6px; border-radius: 4px; color: var(--ink);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>
+        @flarelink/client — auth smoke test
+        <span id="status" class="pill out">signed out</span>
+      </h1>
+      <p class="sub">
+        Quick harness for the SDK's auth surface, loaded straight from
+        <code>../dist/index.js</code>. Configure the URL once, then exercise
+        signUp / signIn / signOut / getSession / magic link / social.
+      </p>
+
+      <div class="card">
+        <h2>Config</h2>
+        <label>
+          <span>Worker URL</span>
+          <input id="cfg-url" placeholder="https://gridsnap-auth.jaan-f97.workers.dev" />
+        </label>
+        <div class="config">
+          <span>SDK loaded</span><code id="cfg-loaded">…</code>
+          <span>Current user</span><code id="cfg-user">(none)</code>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Email + password</h2>
+        <label><span>Email</span><input id="email" type="email" placeholder="jane@example.com" /></label>
+        <label><span>Password</span><input id="password" type="password" placeholder="••••••••" /></label>
+        <label><span>Name (signup only)</span><input id="name" type="text" placeholder="Jane Indie" /></label>
+        <div class="row">
+          <button class="primary" id="btn-signup">signUp</button>
+          <button class="primary" id="btn-signin">signIn</button>
+          <button id="btn-signout">signOut</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Magic link + social</h2>
+        <div class="row">
+          <button id="btn-magic">signInWithMagicLink (uses Email field)</button>
+          <button id="btn-google">signInWithSocial('google')</button>
+          <button id="btn-github">signInWithSocial('github')</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Session</h2>
+        <div class="row">
+          <button id="btn-getsession">getSession</button>
+          <button id="btn-getme">getMe</button>
+          <button id="btn-reset">requestPasswordReset</button>
+          <button id="btn-verify">sendVerificationEmail</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Log</h2>
+        <pre class="log" id="log"></pre>
+      </div>
+    </div>
+
+    <script type="module">
+      // Direct relative import of the SDK build. tsup bundles to a single
+      // file so this works in the browser via plain ESM — no bundler needed
+      // for the harness. Served via `python3 -m http.server` (or anything
+      // that serves files over http; file:// breaks module CORS).
+      import {
+        createFlarelink,
+        AuthError,
+      } from '../dist/index.js';
+
+      const logEl = document.getElementById('log');
+      const cfgUrl = document.getElementById('cfg-url');
+      const cfgLoaded = document.getElementById('cfg-loaded');
+      const cfgUser = document.getElementById('cfg-user');
+      const statusPill = document.getElementById('status');
+
+      const LS_KEY = 'flarelink.examples.url';
+      cfgUrl.value = localStorage.getItem(LS_KEY) || '';
+      cfgUrl.addEventListener('change', () => localStorage.setItem(LS_KEY, cfgUrl.value));
+
+      cfgLoaded.textContent = 'ok (createFlarelink + AuthError imported)';
+
+      function flarelink() {
+        const url = cfgUrl.value.trim();
+        if (!url) throw new Error('Set the Worker URL first.');
+        return createFlarelink({ url });
+      }
+
+      function log(text, cls = '') {
+        const t = new Date().toLocaleTimeString();
+        const line = document.createElement('div');
+        if (cls) line.className = cls;
+        line.textContent = `[${t}] ${text}`;
+        logEl.appendChild(line);
+        logEl.scrollTop = logEl.scrollHeight;
+      }
+
+      async function run(label, fn) {
+        log(`▶ ${label}`, 'dim');
+        try {
+          const r = await fn();
+          log(`  ok → ${JSON.stringify(r, null, 2)}`, 'ok');
+          await refreshSession();
+        } catch (err) {
+          const codeMsg = err instanceof AuthError && err.code ? ` (code=${err.code}, status=${err.status})` : '';
+          log(`  ✗ ${err.constructor.name}: ${err.message}${codeMsg}`, 'err');
+        }
+      }
+
+      async function refreshSession() {
+        try {
+          const s = await flarelink().auth.getSession();
+          if (s.user) {
+            cfgUser.textContent = `${s.user.email} (id=${s.user.id})`;
+            statusPill.textContent = 'signed in';
+            statusPill.className = 'pill in';
+          } else {
+            cfgUser.textContent = '(none)';
+            statusPill.textContent = 'signed out';
+            statusPill.className = 'pill out';
+          }
+        } catch {
+          cfgUser.textContent = '(error)';
+        }
+      }
+
+      const $ = (id) => document.getElementById(id).value.trim();
+
+      document.getElementById('btn-signup').onclick = () =>
+        run('auth.signUp', () => flarelink().auth.signUp({
+          email: $('email'), password: $('password'), name: $('name') || 'Test User',
+        }));
+
+      document.getElementById('btn-signin').onclick = () =>
+        run('auth.signIn', () => flarelink().auth.signIn({
+          email: $('email'), password: $('password'),
+        }));
+
+      document.getElementById('btn-signout').onclick = () =>
+        run('auth.signOut', () => flarelink().auth.signOut());
+
+      document.getElementById('btn-magic').onclick = () =>
+        run('auth.signInWithMagicLink', () => flarelink().auth.signInWithMagicLink({
+          email: $('email'),
+        }));
+
+      document.getElementById('btn-google').onclick = () =>
+        run('auth.signInWithSocial(google)', () => flarelink().auth.signInWithSocial('google'));
+
+      document.getElementById('btn-github').onclick = () =>
+        run('auth.signInWithSocial(github)', () => flarelink().auth.signInWithSocial('github'));
+
+      document.getElementById('btn-getsession').onclick = () =>
+        run('auth.getSession', () => flarelink().auth.getSession());
+
+      document.getElementById('btn-getme').onclick = () =>
+        run('auth.getMe', () => flarelink().auth.getMe());
+
+      document.getElementById('btn-reset').onclick = () =>
+        run('auth.requestPasswordReset', () => flarelink().auth.requestPasswordReset({
+          email: $('email'),
+          redirectTo: location.origin + '/reset',
+        }));
+
+      document.getElementById('btn-verify').onclick = () =>
+        run('auth.sendVerificationEmail', () => flarelink().auth.sendVerificationEmail({
+          email: $('email'),
+        }));
+
+      // Initial probe.
+      refreshSession();
+    </script>
+  </body>
+</html>
